@@ -138,6 +138,195 @@
         return false;
     }
 
+    // ============ ELECTRICAL RESISTANCE HEURISTIC ============
+
+    // Get component information: which tiles belong to each component
+    function getComponentInfo(state, player, uf) {
+        const gd = ensureGameData();
+        if (!gd) return { components: new Map(), hasWon: false };
+
+        const components = new Map(); // root -> {tiles: [], antipodes: Set}
+        
+        for (let i = 0; i < state.length; i++) {
+            if (state[i] !== player) continue;
+            const root = uf.find(i);
+            if (!components.has(root)) {
+                components.set(root, { tiles: [], antipodes: new Set() });
+            }
+            components.get(root).tiles.push(i);
+            components.get(root).antipodes.add(gd.Re[i]);
+        }
+
+        // Check if any component contains both a tile and its antipode
+        for (const [root, info] of components) {
+            for (const tile of info.tiles) {
+                if (info.antipodes.has(tile)) {
+                    // This component already won (tile connected to its antipode)
+                    return { components, hasWon: true };
+                }
+            }
+            // Remove antipodes that are in this component (already connected)
+            for (const tile of info.tiles) {
+                info.antipodes.delete(tile);
+            }
+        }
+
+        return { components, hasWon: false };
+    }
+
+    // Solve resistance network using Gauss-Seidel iteration
+    // Returns { resistance, potentials } where potentials[i] is voltage at empty cell i
+    function solveResistanceNetwork(state, player, componentTiles, antipodeSet) {
+        const gd = ensureGameData();
+        if (!gd) return { resistance: Infinity, potentials: {} };
+
+        const n = state.length;
+        const opponent = player === 1 ? 2 : 1;
+        
+        // Build sets for source and target
+        const sourceSet = new Set(componentTiles);
+        const targetSet = antipodeSet;
+
+        // Initialize potentials: source=1, target=0, empty cells start at 0.5
+        const potential = new Array(n).fill(0);
+        const isEmptyCell = new Array(n).fill(false);
+        const emptyCells = [];
+
+        for (let i = 0; i < n; i++) {
+            if (sourceSet.has(i)) {
+                potential[i] = 1.0;
+            } else if (targetSet.has(i)) {
+                potential[i] = 0.0;
+            } else if (state[i] === 0) {
+                potential[i] = 0.5;
+                isEmptyCell[i] = true;
+                emptyCells.push(i);
+            } else if (state[i] === opponent) {
+                potential[i] = -1; // blocked
+            }
+        }
+
+        // Gauss-Seidel iteration
+        const maxIter = 30;
+        for (let iter = 0; iter < maxIter; iter++) {
+            for (const i of emptyCells) {
+                let sum = 0;
+                let count = 0;
+                for (const nb of gd.Ve[i]) {
+                    if (potential[nb] >= 0) { // not blocked
+                        sum += potential[nb];
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    potential[i] = sum / count;
+                }
+            }
+        }
+
+        // Compute total current leaving source (resistance = 1/current)
+        let totalCurrent = 0;
+        for (const src of sourceSet) {
+            for (const nb of gd.Ve[src]) {
+                if (potential[nb] >= 0 && potential[nb] < 1.0) {
+                    totalCurrent += (1.0 - potential[nb]); // conductance=1, so I = V_diff
+                }
+            }
+        }
+
+        const resistance = totalCurrent > 0.001 ? 1.0 / totalCurrent : Infinity;
+
+        return { resistance, potentials: potential };
+    }
+
+    // Calculate current through each empty cell
+    function calculateCurrents(state, potentials) {
+        const gd = ensureGameData();
+        if (!gd) return {};
+
+        const currents = {};
+        for (let i = 0; i < state.length; i++) {
+            if (state[i] !== 0) continue;
+            if (potentials[i] < 0) continue; // blocked
+            
+            let current = 0;
+            for (const nb of gd.Ve[i]) {
+                if (potentials[nb] >= 0) {
+                    current += Math.abs(potentials[i] - potentials[nb]);
+                }
+            }
+            currents[i] = current;
+        }
+        return currents;
+    }
+
+    // Compute minimum resistance for a player across all their components
+    function computeMinResistance(state, player) {
+        const uf = buildConnectedGroups(state, player);
+        if (!uf) return { minResistance: Infinity, potentials: {}, currents: {} };
+
+        const { components, hasWon } = getComponentInfo(state, player, uf);
+        
+        if (hasWon) {
+            return { minResistance: 0, potentials: {}, currents: {} };
+        }
+
+        let minResistance = Infinity;
+        let bestPotentials = {};
+
+        for (const [root, info] of components) {
+            if (info.antipodes.size === 0) continue; // no targets reachable
+            
+            const { resistance, potentials } = solveResistanceNetwork(
+                state, player, info.tiles, info.antipodes
+            );
+            
+            if (resistance < minResistance) {
+                minResistance = resistance;
+                bestPotentials = potentials;
+            }
+        }
+
+        const currents = calculateCurrents(state, bestPotentials);
+        return { minResistance, potentials: bestPotentials, currents };
+    }
+
+    // Electrical resistance evaluation
+    function electricalEval(state) {
+        // Check for wins first
+        if (checkWinWithVirtual(state, 1)) return 1000;
+        if (checkWinWithVirtual(state, 2)) return -1000;
+
+        const red = computeMinResistance(state, 1);
+        const blue = computeMinResistance(state, 2);
+
+        // From Red's perspective: lower red resistance, higher blue resistance = better
+        // Invert and subtract: score = blue_R - red_R (higher = better for red)
+        const redR = red.minResistance === Infinity ? 100 : red.minResistance;
+        const blueR = blue.minResistance === Infinity ? 100 : blue.minResistance;
+
+        return blueR - redR;
+    }
+
+    // Get move priorities based on current importance
+    function getMovePriorities(state) {
+        const red = computeMinResistance(state, 1);
+        const blue = computeMinResistance(state, 2);
+
+        const priorities = [];
+        for (let i = 0; i < state.length; i++) {
+            if (state[i] !== 0) continue;
+            const redCurrent = red.currents[i] || 0;
+            const blueCurrent = blue.currents[i] || 0;
+            const importance = redCurrent + blueCurrent;
+            priorities.push({ move: i, importance });
+        }
+
+        // Sort by importance descending
+        priorities.sort((a, b) => b.importance - a.importance);
+        return priorities.map(p => p.move);
+    }
+
     // Dijkstra shortest path from reference tiles to their antipodal opposites
     function dijkstraPathCost(state, player, refTiles) {
         const gd = ensureGameData();
@@ -207,9 +396,9 @@
         return blueScore - redScore;
     }
 
-    // Enhanced MCTS Node
+    // Enhanced MCTS Node with prioritized expansion
     class MctsNodeEnhanced {
-        constructor(move, parent, state, playerToMove) {
+        constructor(move, parent, state, playerToMove, prioritizedMoves = null) {
             this.move = move;
             this.parent = parent;
             this.state = state;
@@ -217,7 +406,8 @@
             this.children = [];
             this.totalValue = 0;
             this.visits = 0;
-            this.untriedMoves = window.getValidMoves(state);
+            // Use prioritized moves if provided, otherwise fall back to random order
+            this.untriedMoves = prioritizedMoves || window.getValidMoves(state);
         }
 
         ucb1(c = 1.414) {
@@ -236,6 +426,18 @@
                 }
             }
             return best;
+        }
+
+        expandPrioritized() {
+            // Take the first untried move (already sorted by priority)
+            const move = this.untriedMoves.shift();
+            const newState = window.applyMove(this.state, move, this.playerToMove);
+            const nextPlayer = this.playerToMove === 1 ? 2 : 1;
+            // Get prioritized moves for child based on new state
+            const childMoves = getMovePriorities(newState);
+            const child = new MctsNodeEnhanced(move, this, newState, nextPlayer, childMoves);
+            this.children.push(child);
+            return child;
         }
 
         expand() {
@@ -260,15 +462,13 @@
         }
     }
 
-    // Enhanced MCTS search with heuristic evaluation instead of random rollouts
+    // Enhanced MCTS search with electrical resistance evaluation and prioritized expansion
     function mctsSearchEnhanced(iterations, aiPlayer) {
         const state = window.cloneState();
         
-        // Select reference tiles once at the start
-        const refTilesRed = selectReferenceTiles(state, 1, 5);
-        const refTilesBlue = selectReferenceTiles(state, 2, 5);
-        
-        const root = new MctsNodeEnhanced(null, null, state, aiPlayer);
+        // Get prioritized moves for root based on current importance
+        const prioritizedMoves = getMovePriorities(state);
+        const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
 
         for (let i = 0; i < iterations; i++) {
             let node = root;
@@ -278,13 +478,13 @@
                 node = node.bestChild();
             }
 
-            // Expansion
+            // Expansion with prioritized moves
             if (node.untriedMoves.length > 0) {
-                node = node.expand();
+                node = node.expandPrioritized();
             }
 
-            // Evaluation (heuristic instead of random rollout)
-            const value = evaluatePosition(node.state, refTilesRed, refTilesBlue);
+            // Evaluation using electrical resistance
+            const value = electricalEval(node.state);
             
             // Normalize value to [-1, 1] range for MCTS
             const normalizedValue = Math.max(-1, Math.min(1, value / 100));
@@ -392,13 +592,13 @@
         return { move: bestMove, iterations };
     }
 
-    // Time-limited enhanced MCTS
+    // Time-limited enhanced MCTS with electrical resistance
     function mctsSearchEnhancedTimed(timeLimitMs, aiPlayer) {
         const state = window.cloneState();
-        const refTilesRed = selectReferenceTiles(state, 1, 5);
-        const refTilesBlue = selectReferenceTiles(state, 2, 5);
         
-        const root = new MctsNodeEnhanced(null, null, state, aiPlayer);
+        // Get prioritized moves for root
+        const prioritizedMoves = getMovePriorities(state);
+        const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
         
         const startTime = performance.now();
         let iterations = 0;
@@ -411,10 +611,10 @@
             }
             
             if (node.untriedMoves.length > 0) {
-                node = node.expand();
+                node = node.expandPrioritized();
             }
             
-            const value = evaluatePosition(node.state, refTilesRed, refTilesBlue);
+            const value = electricalEval(node.state);
             const normalizedValue = Math.max(-1, Math.min(1, value / 100));
             
             mctsBackpropEnhanced(node, normalizedValue, aiPlayer);
@@ -569,6 +769,6 @@
         runNextGame();
     };
 
-    console.log("Enhanced AI loaded");
+    console.log("Enhanced AI loaded (Electrical Resistance Heuristic)");
 })();
 
