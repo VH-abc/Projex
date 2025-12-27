@@ -21682,7 +21682,7 @@ function Nl() {
     return new Lt(i,i * 1.2,i)
 }
 let Si = null, Jt = new Array, Re = new Array, Ve = new Array, Ua = !1, $e, Fl = !1, Ol = !1, Bl = !1, zl = !1, Hs = 3, qn = null, Ia = !1;
-let vsAI = !1, humanColor = null, aiColor = null, mctsIter = 1000;
+let vsAI = !1, humanColor = null, aiColor = null, mctsIter = 7071;
 
 function cloneState() {
     const state = [];
@@ -21843,8 +21843,17 @@ function Te(i, t) {
     Jt[Re[i]].material.opacity = 0.85
 }
 function Vs(i, t) {
-    Jt[i].material.metalness = t,
-    Jt[Re[i]].material.metalness = t
+    Jt[i].material.metalness = t;
+    Jt[Re[i]].material.metalness = t;
+    if (t > 0) {
+        Jt[i].material.emissive = Jt[i].material.color;
+        Jt[i].material.emissiveIntensity = 0.4;
+        Jt[Re[i]].material.emissive = Jt[Re[i]].material.color;
+        Jt[Re[i]].material.emissiveIntensity = 0.4;
+    } else {
+        Jt[i].material.emissiveIntensity = 0;
+        Jt[Re[i]].material.emissiveIntensity = 0;
+    }
 }
 function Na() {
     Ia = !1;
@@ -21905,9 +21914,9 @@ function Hm(i, t) {
                 a.material = new xh({
                     color: 0xffffff,
                     map: earthTex,
-                    flatShading: !0,
+                flatShading: !0,
                     opacity: 1.0,
-                    transparent: !0,
+                transparent: !0,
                     side: tn,
                     polygonOffset: !0,
                     polygonOffsetFactor: 1,

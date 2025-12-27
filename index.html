@@ -296,7 +296,7 @@
         </div>
         <div class="slider-container">
           <label>AI Strength (MCTS iterations):</label>
-          <input type="range" id="mcts-slider" min="100" max="10000" value="1000" step="100">
+          <input type="range" id="mcts-slider" min="0" max="100" value="50" step="1">
           <div class="slider-value" id="mcts-value">1000 iterations</div>
         </div>
       </div>
@@ -430,11 +430,18 @@
         });
 
         mctsSlider.addEventListener('input', function() {
-          mctsValue.textContent = this.value + ' iterations';
+          // Log scale: 0-100 slider maps to 50-1000000 iterations
+          const minIter = 50, maxIter = 1000000;
+          const minLog = Math.log(minIter), maxLog = Math.log(maxIter);
+          const scale = (maxLog - minLog) / 100;
+          const iterations = Math.round(Math.exp(minLog + scale * this.value));
+          mctsValue.textContent = iterations.toLocaleString() + ' iterations';
           if (window.setMctsIterations) {
-            window.setMctsIterations(this.value);
+            window.setMctsIterations(iterations);
           }
         });
+        // Initialize with default value
+        mctsSlider.dispatchEvent(new Event('input'));
       });
     </script>
 
