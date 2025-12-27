@@ -21682,6 +21682,160 @@ function Nl() {
     return new Lt(i,i * 1.2,i)
 }
 let Si = null, Jt = new Array, Re = new Array, Ve = new Array, Ua = !1, $e, Fl = !1, Ol = !1, Bl = !1, zl = !1, Hs = 3, qn = null, Ia = !1;
+let vsAI = !1, humanColor = null, aiColor = null, mctsIter = 1000;
+
+function cloneState() {
+    const state = [];
+    for (let i = 0; i < Jt.length; i++) {
+        const c = Jt[i].material.color;
+        if (c.equals(me)) state.push(1);
+        else if (c.equals(rn)) state.push(2);
+        else state.push(0);
+    }
+    return state;
+}
+
+function getValidMoves(state) {
+    const moves = [];
+    for (let i = 0; i < state.length; i++) {
+        if (state[i] === 0) moves.push(i);
+    }
+    return moves;
+}
+
+function applyMove(state, move, player) {
+    const newState = state.slice();
+    newState[move] = player;
+    return newState;
+}
+
+function checkWinFast(state, player) {
+    for (let start = 0; start < state.length; start++) {
+        if (state[start] !== player) continue;
+        const target = Re[start];
+        const visited = new Set();
+        const queue = [start];
+        visited.add(start);
+        while (queue.length > 0) {
+            const curr = queue.shift();
+            if (curr === target) return true;
+            for (const neighbor of Ve[curr]) {
+                if (!visited.has(neighbor) && state[neighbor] === player) {
+                    visited.add(neighbor);
+                    queue.push(neighbor);
+                }
+            }
+        }
+    }
+    return false;
+}
+
+class MctsNode {
+    constructor(move, parent, state, playerToMove) {
+        this.move = move;
+        this.parent = parent;
+        this.state = state;
+        this.playerToMove = playerToMove;
+        this.children = [];
+        this.wins = 0;
+        this.visits = 0;
+        this.untriedMoves = getValidMoves(state);
+    }
+    
+    ucb1(c = 1.414) {
+        if (this.visits === 0) return Infinity;
+        return this.wins / this.visits + c * Math.sqrt(Math.log(this.parent.visits) / this.visits);
+    }
+    
+    bestChild() {
+        let best = null, bestScore = -Infinity;
+        for (const child of this.children) {
+            const score = child.ucb1();
+            if (score > bestScore) {
+                bestScore = score;
+                best = child;
+            }
+        }
+        return best;
+    }
+    
+    expand() {
+        const idx = Math.floor(Math.random() * this.untriedMoves.length);
+        const move = this.untriedMoves.splice(idx, 1)[0];
+        const newState = applyMove(this.state, move, this.playerToMove);
+        const nextPlayer = this.playerToMove === 1 ? 2 : 1;
+        const child = new MctsNode(move, this, newState, nextPlayer);
+        this.children.push(child);
+        return child;
+    }
+}
+
+function mctsSimulate(state, currentPlayer) {
+    let simState = state.slice();
+    let player = currentPlayer;
+    let moves = getValidMoves(simState);
+    while (moves.length > 0) {
+        if (checkWinFast(simState, 1)) return 1;
+        if (checkWinFast(simState, 2)) return 2;
+        const move = moves[Math.floor(Math.random() * moves.length)];
+        simState[move] = player;
+        player = player === 1 ? 2 : 1;
+        moves = getValidMoves(simState);
+    }
+    if (checkWinFast(simState, 1)) return 1;
+    if (checkWinFast(simState, 2)) return 2;
+    return 0;
+}
+
+function mctsBackpropagate(node, winner, aiPlayer) {
+    while (node !== null) {
+        node.visits++;
+        if (winner === aiPlayer) node.wins++;
+        else if (winner !== 0) node.wins -= 0.5;
+        node = node.parent;
+    }
+}
+
+function mctsSearch(iterations, aiPlayer) {
+    const state = cloneState();
+    const root = new MctsNode(null, null, state, aiPlayer);
+    
+    for (let i = 0; i < iterations; i++) {
+        let node = root;
+        while (node.untriedMoves.length === 0 && node.children.length > 0) {
+            node = node.bestChild();
+        }
+        if (node.untriedMoves.length > 0) {
+            node = node.expand();
+        }
+        const winner = mctsSimulate(node.state, node.playerToMove);
+        mctsBackpropagate(node, winner, aiPlayer);
+    }
+    
+    let bestMove = null, bestVisits = -1;
+    for (const child of root.children) {
+        if (child.visits > bestVisits) {
+            bestVisits = child.visits;
+            bestMove = child.move;
+        }
+    }
+    return bestMove;
+}
+
+function runAI() {
+    if (!vsAI || Ia || !aiColor || !$e || !$e.equals(aiColor)) return;
+    const aiPlayer = aiColor.equals(me) ? 1 : 2;
+    const move = mctsSearch(mctsIter, aiPlayer);
+    if (move !== null) {
+        qn !== null && Vs(qn, 0);
+        qn = move;
+        Te(move, aiColor);
+        Vs(move, Bm);
+        Ia = Vl(move, aiColor);
+        if (!Ia) zi();
+    }
+}
+
 function Te(i, t) {
     Jt[i].material.color = t,
     Jt[i].material.opacity = 0.85,
@@ -21951,7 +22105,11 @@ function zi(i) {
     t.style.background = $e === me ? "rgba(255, 0, 0, 1)" : "rgba(0, 0, 255, 1)";
     const e = $e === me ? "Red" : "Blue";
     t.textContent = `${e}'s turn`,
-    t.style.display = "block"
+    t.style.display = "block";
+    if (vsAI && $e === aiColor) {
+        t.textContent = `${e} (AI) thinking...`;
+        setTimeout(runAI, 150);
+    }
 }
 function Vl(i, t) {
     const e = t === me ? Ul : Il
@@ -22045,3 +22203,29 @@ function Wl() {
     qs.render(Xs, Ln)
 }
 Wl();
+
+window.setAIEnabled = function(enabled) {
+    vsAI = enabled;
+    if (enabled && humanColor === null) {
+        humanColor = me;
+        aiColor = rn;
+    }
+};
+
+window.setHumanColor = function(color) {
+    if (color === 'red') {
+        humanColor = me;
+        aiColor = rn;
+    } else {
+        humanColor = rn;
+        aiColor = me;
+    }
+};
+
+window.setMctsIterations = function(iter) {
+    mctsIter = parseInt(iter);
+};
+
+window.getAISettings = function() {
+    return { vsAI, mctsIter };
+};

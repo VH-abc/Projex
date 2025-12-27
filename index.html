@@ -118,6 +118,62 @@
         text-align: center;
         padding: 20px;
       }
+
+      #ai-settings {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        padding: 12px 16px;
+        background: rgba(0,0,0,0.5);
+        color: white;
+        border-radius: 5px;
+        width: 280px;
+        font-size: 0.95rem;
+      }
+
+      #ai-settings h3 {
+        margin: 0 0 10px 0;
+        font-size: 1.1rem;
+        border-bottom: 1px solid rgba(255,255,255,0.3);
+        padding-bottom: 6px;
+      }
+
+      #ai-settings label {
+        display: block;
+        margin: 8px 0;
+        cursor: pointer;
+      }
+
+      #ai-settings input[type="checkbox"],
+      #ai-settings input[type="radio"] {
+        margin-right: 8px;
+        cursor: pointer;
+      }
+
+      #ai-settings .color-options {
+        margin-left: 20px;
+        margin-top: 6px;
+      }
+
+      #ai-settings .slider-container {
+        margin-top: 12px;
+      }
+
+      #ai-settings input[type="range"] {
+        width: 100%;
+        margin-top: 6px;
+      }
+
+      #ai-settings .slider-value {
+        text-align: center;
+        font-size: 0.9rem;
+        color: rgba(255,255,255,0.8);
+      }
+
+      #ai-settings .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
     </style>
     <script type="module" crossorigin src="./assets/index-DuLHqKrh.js"></script>
   </head>
@@ -224,6 +280,28 @@
     turn 
     </div>
 
+    <div id="ai-settings">
+      <h3>AI Opponent</h3>
+      <label>
+        <input type="checkbox" id="ai-toggle"> Play vs AI
+      </label>
+      <div id="ai-options" class="disabled">
+        <div class="color-options">
+          <label>
+            <input type="radio" name="player-color" value="red" checked> Play as Red
+          </label>
+          <label>
+            <input type="radio" name="player-color" value="blue"> Play as Blue
+          </label>
+        </div>
+        <div class="slider-container">
+          <label>AI Strength (MCTS iterations):</label>
+          <input type="range" id="mcts-slider" min="100" max="10000" value="1000" step="100">
+          <div class="slider-value" id="mcts-value">1000 iterations</div>
+        </div>
+      </div>
+    </div>
+
     <script>
       // Load and display the model picker
       async function loadModelPicker() {
@@ -322,6 +400,42 @@
       
       // Load the model picker when the page loads
       document.addEventListener('DOMContentLoaded', loadModelPicker);
+
+      // AI Settings wiring
+      document.addEventListener('DOMContentLoaded', function() {
+        const aiToggle = document.getElementById('ai-toggle');
+        const aiOptions = document.getElementById('ai-options');
+        const mctsSlider = document.getElementById('mcts-slider');
+        const mctsValue = document.getElementById('mcts-value');
+        const colorRadios = document.querySelectorAll('input[name="player-color"]');
+
+        aiToggle.addEventListener('change', function() {
+          const enabled = this.checked;
+          if (enabled) {
+            aiOptions.classList.remove('disabled');
+          } else {
+            aiOptions.classList.add('disabled');
+          }
+          if (window.setAIEnabled) {
+            window.setAIEnabled(enabled);
+          }
+        });
+
+        colorRadios.forEach(radio => {
+          radio.addEventListener('change', function() {
+            if (window.setHumanColor) {
+              window.setHumanColor(this.value);
+            }
+          });
+        });
+
+        mctsSlider.addEventListener('input', function() {
+          mctsValue.textContent = this.value + ' iterations';
+          if (window.setMctsIterations) {
+            window.setMctsIterations(this.value);
+          }
+        });
+      });
     </script>
 
 </html>
