@@ -176,6 +176,7 @@
       }
     </style>
     <script type="module" crossorigin src="./assets/index-DuLHqKrh.js"></script>
+    <script src="./assets/ai-enhanced.js" defer></script>
   </head>
   <body>
     
@@ -299,7 +300,51 @@
           <input type="range" id="mcts-slider" min="0" max="100" value="50" step="1">
           <div class="slider-value" id="mcts-value">1000 iterations</div>
         </div>
+        <div style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 10px;">
+          <label style="font-weight: bold;">AI Type:</label>
+          <label>
+            <input type="radio" name="ai-type" value="basic" checked> Basic MCTS
+          </label>
+          <label>
+            <input type="radio" name="ai-type" value="enhanced"> Enhanced (Heuristic)
+          </label>
+        </div>
       </div>
+    </div>
+
+    <div id="ai-test-panel" style="
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border-radius: 5px;
+      width: 300px;
+      font-size: 0.9rem;
+    ">
+      <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 6px;">AI vs AI Test (Time-Matched)</h3>
+      <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-bottom: 8px;">Both AIs get equal time per move</div>
+      <div style="margin-bottom: 10px;">
+        <label>Number of games:</label>
+        <input type="number" id="test-games" value="10" min="1" max="100" style="width: 60px; margin-left: 8px;">
+      </div>
+      <button id="run-test-btn" style="
+        padding: 8px 16px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.95rem;
+      ">Run Test</button>
+      <div id="test-progress" style="margin-top: 10px; display: none;">
+        <div style="background: rgba(255,255,255,0.2); border-radius: 4px; height: 20px; overflow: hidden;">
+          <div id="progress-bar" style="background: linear-gradient(90deg, #4CAF50, #8BC34A); height: 100%; width: 0%; transition: width 0.2s;"></div>
+        </div>
+        <div id="progress-text" style="text-align: center; margin-top: 4px; font-size: 0.85rem;"></div>
+      </div>
+      <div id="test-results" style="margin-top: 10px; font-size: 0.85rem;"></div>
     </div>
 
     <script>
@@ -442,6 +487,77 @@
         });
         // Initialize with default value
         mctsSlider.dispatchEvent(new Event('input'));
+
+        // AI Type selection
+        const aiTypeRadios = document.querySelectorAll('input[name="ai-type"]');
+        aiTypeRadios.forEach(radio => {
+          radio.addEventListener('change', function() {
+            if (window.setEnhancedAI) {
+              window.setEnhancedAI(this.value === 'enhanced');
+            }
+          });
+        });
+
+        // Test button
+        const runTestBtn = document.getElementById('run-test-btn');
+        const testGamesInput = document.getElementById('test-games');
+        const testProgress = document.getElementById('test-progress');
+        const testResults = document.getElementById('test-results');
+
+        runTestBtn.addEventListener('click', function() {
+          if (!window.testAIs) {
+            testResults.innerHTML = '<span style="color: #ff6b6b;">Please load a model first</span>';
+            return;
+          }
+
+          const numGames = parseInt(testGamesInput.value) || 10;
+          runTestBtn.disabled = true;
+          runTestBtn.textContent = 'Running...';
+          testProgress.style.display = 'block';
+          testResults.innerHTML = '';
+          
+          // Reset progress bar
+          const progressBar = document.getElementById('progress-bar');
+          const progressText = document.getElementById('progress-text');
+          progressBar.style.width = '0%';
+          progressText.textContent = 'Starting...';
+
+          // Ensure even number of games for fair Red/Blue distribution
+          const actualGames = numGames % 2 === 0 ? numGames : numGames + 1;
+
+          window.testAIs(actualGames, function(update) {
+            if (update.done) {
+              runTestBtn.disabled = false;
+              runTestBtn.textContent = 'Run Test';
+              progressBar.style.width = '100%';
+              progressBar.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+              progressText.textContent = 'Complete!';
+              
+              const r = update.results;
+              testResults.innerHTML = `
+                <div style="margin-bottom: 6px;"><strong>Results (${actualGames} games, ${r.timePerMoveMs}ms/move):</strong></div>
+                <div>Basic AI wins: ${r.basicWins} (${r.basicWinRate})</div>
+                <div>Enhanced AI wins: ${r.enhancedWins} (${r.enhancedWinRate})</div>
+                <div>Draws: ${r.draws}</div>
+                <div style="margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px;">
+                  <div>Avg moves/game: ${r.avgMoves.toFixed(1)}</div>
+                  <div>Basic: ${r.avgBasicIter} iter/move avg</div>
+                  <div>Enhanced: ${r.avgEnhancedIter} iter/move avg</div>
+                </div>
+              `;
+            } else {
+              const pct = (update.progress / update.total * 100).toFixed(0);
+              progressBar.style.width = pct + '%';
+              progressText.textContent = `Game ${update.progress} / ${update.total}`;
+              
+              // Show current standings
+              const r = update.results;
+              if (r.basicWins + r.enhancedWins > 0) {
+                progressText.textContent += ` (Basic: ${r.basicWins}, Enhanced: ${r.enhancedWins})`;
+              }
+            }
+          });
+        });
       });
     </script>
 

@@ -21825,7 +21825,12 @@ function mctsSearch(iterations, aiPlayer) {
 function runAI() {
     if (!vsAI || Ia || !aiColor || !$e || !$e.equals(aiColor)) return;
     const aiPlayer = aiColor.equals(me) ? 1 : 2;
-    const move = mctsSearch(mctsIter, aiPlayer);
+    let move;
+    if (window.isEnhancedAI && window.isEnhancedAI() && window.mctsSearchEnhanced) {
+        move = window.mctsSearchEnhanced(mctsIter, aiPlayer);
+    } else {
+        move = mctsSearch(mctsIter, aiPlayer);
+    }
     if (move !== null) {
         qn !== null && Vs(qn, 0);
         qn = move;
@@ -22238,3 +22243,13 @@ window.setMctsIterations = function(iter) {
 window.getAISettings = function() {
     return { vsAI, mctsIter };
 };
+
+window.getGameData = function() {
+    return { Ve, Re, tileCount: Jt.length, me, rn };
+};
+
+window.cloneState = cloneState;
+window.getValidMoves = getValidMoves;
+window.applyMove = applyMove;
+window.checkWinFast = checkWinFast;
+window.mctsSearch = mctsSearch;
