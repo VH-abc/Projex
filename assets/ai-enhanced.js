@@ -524,6 +524,39 @@
 
     window.mctsSearchEnhanced = mctsSearchEnhanced;
 
+    // Expose current flow data for visualization
+    window.getCurrentFlowData = function() {
+        const state = window.cloneState();
+        const red = computeMinResistance(state, 1);
+        const blue = computeMinResistance(state, 2);
+        
+        // Find max current for normalization
+        let maxCurrent = 0.001; // avoid division by zero
+        for (const i in red.currents) {
+            maxCurrent = Math.max(maxCurrent, red.currents[i]);
+        }
+        for (const i in blue.currents) {
+            maxCurrent = Math.max(maxCurrent, blue.currents[i]);
+        }
+        
+        // Combine currents (importance = red + blue current)
+        const combined = {};
+        for (let i = 0; i < state.length; i++) {
+            if (state[i] === 0) {
+                combined[i] = (red.currents[i] || 0) + (blue.currents[i] || 0);
+            }
+        }
+        
+        return {
+            redCurrents: red.currents,
+            blueCurrents: blue.currents,
+            combined: combined,
+            maxCurrent: maxCurrent,
+            redResistance: red.minResistance,
+            blueResistance: blue.minResistance
+        };
+    };
+
     // Time-limited MCTS for basic AI
     function mctsSearchTimed(timeLimitMs, aiPlayer) {
         const state = window.cloneState();

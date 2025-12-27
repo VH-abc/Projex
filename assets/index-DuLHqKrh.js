@@ -21845,7 +21845,11 @@ function Te(i, t) {
     Jt[i].material.color = t,
     Jt[i].material.opacity = 0.85,
     Jt[Re[i]].material.color = t,
-    Jt[Re[i]].material.opacity = 0.85
+    Jt[Re[i]].material.opacity = 0.85;
+    // Update current flow visualization after move
+    if (showCurrentFlow && window.updateCurrentFlowVisualization) {
+        setTimeout(window.updateCurrentFlowVisualization, 50);
+    }
 }
 function Vs(i, t) {
     Jt[i].material.metalness = t;
@@ -22253,3 +22257,52 @@ window.getValidMoves = getValidMoves;
 window.applyMove = applyMove;
 window.checkWinFast = checkWinFast;
 window.mctsSearch = mctsSearch;
+
+let showCurrentFlow = false;
+
+window.setShowCurrentFlow = function(enabled) {
+    showCurrentFlow = enabled;
+    if (!enabled) {
+        clearCurrentFlowVisualization();
+    }
+};
+
+window.updateCurrentFlowVisualization = function() {
+    if (!showCurrentFlow || !window.getCurrentFlowData) return;
+    
+    const flowData = window.getCurrentFlowData();
+    const maxCurrent = Math.max(0.001, 
+        Math.max(...Object.values(flowData.combined || {}), 0.001)
+    );
+    
+    // Apply glow to empty tiles based on current
+    for (let i = 0; i < Jt.length; i++) {
+        const tile = Jt[i];
+        const tileColor = tile.material.color;
+        
+        // Only apply to empty tiles (not red, not blue)
+        if (!tileColor.equals(me) && !tileColor.equals(rn)) {
+            const current = flowData.combined[i] || 0;
+            const intensity = Math.min(0.8, (current / maxCurrent) * 0.8);
+            
+            if (intensity > 0.05) {
+                // Yellow/orange glow for high-current cells
+                tile.material.emissive = new Lt(0xFFAA00);
+                tile.material.emissiveIntensity = intensity;
+            } else {
+                tile.material.emissiveIntensity = 0;
+            }
+        }
+    }
+};
+
+function clearCurrentFlowVisualization() {
+    for (let i = 0; i < Jt.length; i++) {
+        const tile = Jt[i];
+        const tileColor = tile.material.color;
+        // Clear glow from empty tiles only
+        if (!tileColor.equals(me) && !tileColor.equals(rn)) {
+            tile.material.emissiveIntensity = 0;
+        }
+    }
+}

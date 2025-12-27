@@ -309,6 +309,14 @@
             <input type="radio" name="ai-type" value="enhanced"> Enhanced (Heuristic)
           </label>
         </div>
+        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 10px;">
+          <label>
+            <input type="checkbox" id="show-current-flow"> Show current flow
+          </label>
+          <div id="flow-legend" style="display: none; font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-top: 4px;">
+            Brighter = higher current (bottleneck)
+          </div>
+        </div>
       </div>
     </div>
 
@@ -496,6 +504,20 @@
               window.setEnhancedAI(this.value === 'enhanced');
             }
           });
+        });
+
+        // Current flow visualization toggle
+        const showFlowCheckbox = document.getElementById('show-current-flow');
+        const flowLegend = document.getElementById('flow-legend');
+        
+        showFlowCheckbox.addEventListener('change', function() {
+          flowLegend.style.display = this.checked ? 'block' : 'none';
+          if (window.setShowCurrentFlow) {
+            window.setShowCurrentFlow(this.checked);
+          }
+          if (this.checked && window.updateCurrentFlowVisualization) {
+            window.updateCurrentFlowVisualization();
+          }
         });
 
         // Test button
