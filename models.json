@@ -1,0 +1,482 @@
+{
+    "categories": [
+      {
+        "id": "projective-hex",
+        "name": "Projective Hex Boards"
+      },
+      {
+        "id": "scenarios",
+        "name": "Scenarios"
+      }
+    ],
+    "models": [
+      {
+        "id": "g-2-0",
+        "name": "G(2,0) (Start Here!)",
+        "file": "polyhedronisme-C100du2I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-3-0",
+        "name": "G(3,0) (Recommended!)",
+        "file": "polyhedronisme-C100du3I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-4-0",
+        "name": "G(4,0) (Recommended!)",
+        "file": "polyhedronisme-C100du4I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-5-0",
+        "name": "G(5,0)",
+        "file": "polyhedronisme-C100du5I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-6-0",
+        "name": "G(6,0)",
+        "file": "polyhedronisme-A100du6I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-7-0",
+        "name": "G(7,0)",
+        "file": "polyhedronisme-A100du7I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "dodec",
+        "name": "Dodecahedron",
+        "file": "polyhedronisme-D.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-1-1",
+        "name": "G(1,1)",
+        "file": "polyhedronisme-tI.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-2-2",
+        "name": "G(2,2)",
+        "file": "polyhedronisme-C100tu2I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-3-3",
+        "name": "G(3,3)",
+        "file": "polyhedronisme-C100tu3I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g-4-4",
+        "name": "G(4,4)",
+        "file": "polyhedronisme-A100tu4I.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Choose Your Goldberg"
+      },
+      {
+        "id": "g4-5-0",
+        "name": "G4(5,0)",
+        "file": "polyhedronisme-C100du5O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-6-0",
+        "name": "G4(6,0)",
+        "file": "polyhedronisme-C100du6O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-7-0",
+        "name": "G4(7,0)",
+        "file": "polyhedronisme-C100du7O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-8-0",
+        "name": "G4(8,0)",
+        "file": "polyhedronisme-C100du8O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-1-1",
+        "name": "G4(1,1)",
+        "file": "polyhedronisme-tO.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-2-2",
+        "name": "G4(2,2)",
+        "file": "polyhedronisme-C100tuO.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-3-3",
+        "name": "G4(3,3)",
+        "file": "polyhedronisme-C100tu3O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "g4-4-4",
+        "name": "G4(4,4)",
+        "file": "polyhedronisme-C100tu4O.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Octahedral Options"
+      },
+      {
+        "id": "tjjC",
+        "name": "2x2 tri-corners",
+        "file": "polyhedronisme-A100tjjC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "taaC",
+        "name": "3x3 hex-corners",
+        "file": "polyhedronisme-A100taaC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "tjoC",
+        "name": "2sqrt(2)x2sqrt(2) tri-corners",
+        "file": "polyhedronisme-A100tjoC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "taoC",
+        "name": "3sqrt(2)x3sqrt(2) hex-corners",
+        "file": "polyhedronisme-A100taoC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "tjjoC",
+        "name": "4x4 tri-corners",
+        "file": "polyhedronisme-A100tjjoC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },    
+      {
+        "id": "taaoC",
+        "name": "5x5 hex-corners",
+        "file": "polyhedronisme-A100taaoC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "tjooC",
+        "name": "4sqrt(2)x4sqrt(2) tri-corners",
+        "file": "polyhedronisme-A100tjooC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "taooC",
+        "name": "5sqrt(2)x5sqrt(2) hex-corners",
+        "file": "polyhedronisme-A100taooC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "tjjooC",
+        "name": "8x8 tri-corners",
+        "file": "polyhedronisme-A100tjjooC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "taaooC",
+        "name": "9x9 hex-corners",
+        "file": "polyhedronisme-A100taaooC.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Projective Quax"
+      },
+      {
+        "id": "disk-4x4",
+        "name": "4x4 Disk",
+        "file": "polyhedronisme-du4dP6.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Disks"
+      },
+      {
+        "id": "disk-5x5",
+        "name": "5x5 Disk",
+        "file": "polyhedronisme-du5dP6.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Disks"
+      },
+      {
+        "id": "disk-6x6",
+        "name": "6x6 Disk",
+        "file": "polyhedronisme-du6dP6.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Disks"
+      },
+      {
+        "id": "disk-7x7",
+        "name": "7x7 Disk",
+        "file": "polyhedronisme-du7dP6.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Disks"
+      },
+      {
+        "id": "cylinder-12x8",
+        "name": "12x8 Cylinder",
+        "file": "Cylinder_12x8.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Cylinders"
+      },
+      {
+        "id": "cylinder-16x8",
+        "name": "16x8 Cylinder",
+        "file": "Cylinder_16x8.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Cylinders"
+      },
+      {
+        "id": "cylinder-16x12",
+        "name": "16x12 Cylinder",
+        "file": "Cylinder_16x12.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Cylinders"
+      },
+      {
+        "id": "cylinder-24x12",
+        "name": "24x12 Cylinder",
+        "file": "Cylinder_24x12.obj",
+        "category": "projective-hex",
+        "gameMode": "projex",
+        "subcategory": "Cylinders"
+      },
+      {
+        "id": "hex-7x7",
+        "name": "7x7 Hex",
+        "file": "2DHEX-du8O.obj",
+        "category": "scenarios",
+        "gameMode": "hex",
+        "subcategory": "I want to play normal Hex!"
+      },
+      {
+        "id": "hex-9x9",
+        "name": "9x9 Hex",
+        "file": "2DHEX-du10O.obj",
+        "category": "scenarios",
+        "gameMode": "hex",
+        "subcategory": "I want to play normal Hex!"
+      },
+      {
+        "id": "hex-11x11",
+        "name": "11x11 Hex",
+        "file": "2DHEX-du12O.obj",
+        "category": "scenarios",
+        "gameMode": "hex",
+        "subcategory": "I want to play normal Hex!"
+      },
+      {
+        "id": "hex-13x13",
+        "name": "13x13 Hex",
+        "file": "2DHEX-du14O.obj",
+        "category": "scenarios",
+        "gameMode": "hex",
+        "subcategory": "I want to play normal Hex!"
+      },
+      {
+        "id": "square-hex-5x5",
+        "name": "5x5 Square Hex",
+        "file": "2DHEX-du6O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "1",
+        "subcategory": "Square Hex"
+      },
+      {
+        "id": "square-hex-7x7",
+        "name": "7x7 Square Hex",
+        "file": "2DHEX-du8O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "1",
+        "subcategory": "Square Hex"
+      },
+      {
+        "id": "square-hex-9x9",
+        "name": "9x9 Square Hex",
+        "file": "2DHEX-du10O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "1",
+        "subcategory": "Square Hex"
+      },
+      {
+        "id": "square-hex-11x11",
+        "name": "11x11 Square Hex",
+        "file": "2DHEX-du12O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "1",
+        "subcategory": "Square Hex"
+      },
+      {
+        "id": "atoll-5x5",
+        "name": "5x5 Atoll",
+        "file": "2DHEX-du6O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "2",
+        "subcategory": "Atoll (by Mark Steere)"
+      },
+      {
+        "id": "atoll-7x7",
+        "name": "7x7 Atoll",
+        "file": "2DHEX-du8O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "2",
+        "subcategory": "Atoll (by Mark Steere)"
+      },
+      {
+        "id": "atoll-9x9",
+        "name": "9x9 Atoll",
+        "file": "2DHEX-du10O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "2",
+        "subcategory": "Atoll (by Mark Steere)"
+      },
+      {
+        "id": "atoll-11x11",
+        "name": "11x11 Atoll",
+        "file": "2DHEX-du12O.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "2",
+        "subcategory": "Atoll (by Mark Steere)"
+      },
+      {
+        "id": "mobius-12x8",
+        "name": "12x8 Möbius",
+        "file": "Cylinder_12x8.obj",
+        "category": "scenarios",
+        "gameMode": "mobius",
+        "subcategory": "Möbius"
+      },
+      {
+        "id": "mobius-16x8",
+        "name": "16x8 Möbius",
+        "file": "Cylinder_16x8.obj",
+        "category": "scenarios",
+        "gameMode": "mobius",
+        "subcategory": "Möbius"
+      },
+      {
+        "id": "mobius-16x12",
+        "name": "16x12 Möbius",
+        "file": "Cylinder_16x12.obj",
+        "category": "scenarios",
+        "gameMode": "mobius",
+        "subcategory": "Möbius"
+      },
+      {
+        "id": "mobius-24x12",
+        "name": "24x12 Möbius",
+        "file": "Cylinder_24x12.obj",
+        "category": "scenarios",
+        "gameMode": "mobius",
+        "subcategory": "Möbius"
+      },
+      {
+        "id": "hex-hex-3x3",
+        "name": "3x3 Hex Hex",
+        "file": "polyhedronisme-du4dP6.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "3",
+        "subcategory": "Hex Hex"
+      },
+      {
+        "id": "hex-hex-5x5",
+        "name": "5x5 Hex Hex",
+        "file": "polyhedronisme-du6dP6.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "3",
+        "subcategory": "Hex Hex"
+      },
+      {
+        "id": "hex-hex-7x7",
+        "name": "7x7 Hex Hex",
+        "file": "polyhedronisme-du8dP6.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "3",
+        "subcategory": "Hex Hex"
+      },
+      {
+        "id": "hex-hex-9x9",
+        "name": "9x9 Hex Hex",
+        "file": "polyhedronisme-du10dP6.obj",
+        "category": "scenarios",
+        "gameMode": "atoll2",
+        "atoll": "3",
+        "subcategory": "Hex Hex"
+      }
+    ]
+  } 
