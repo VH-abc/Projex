@@ -67,6 +67,7 @@
     }
 
     // Find bridge patterns: two same-colored tiles sharing exactly 2 common empty neighbors
+    // Find bridge patterns: returns [{tiles: [i,j], emptyCells: [e1,e2]}]
     function findBridges(state, player) {
         const gd = ensureGameData();
         if (!gd) return [];
@@ -87,14 +88,43 @@
                     }
                 }
                 if (commonEmpty.length === 2) {
-                    bridges.push([i, j]);
+                    bridges.push({ tiles: [i, j], emptyCells: commonEmpty });
                 }
             }
         }
         return bridges;
     }
 
-    // Build connected groups with virtual connections
+    // Greedy selection of non-conflicting bridges (no shared empty cells)
+    function selectNonConflictingBridges(bridges) {
+        const selected = [];
+        const usedCells = new Set();
+
+        for (const bridge of bridges) {
+            const [e1, e2] = bridge.emptyCells;
+            // Check if either empty cell is already used by another bridge
+            if (!usedCells.has(e1) && !usedCells.has(e2)) {
+                selected.push(bridge);
+                usedCells.add(e1);
+                usedCells.add(e2);
+            }
+        }
+        return selected;
+    }
+
+    // Get all empty cells that are part of a player's valid bridges
+    function getBridgeEmptyCells(state, player) {
+        const allBridges = findBridges(state, player);
+        const validBridges = selectNonConflictingBridges(allBridges);
+        const cells = new Set();
+        for (const bridge of validBridges) {
+            cells.add(bridge.emptyCells[0]);
+            cells.add(bridge.emptyCells[1]);
+        }
+        return cells;
+    }
+
+    // Build connected groups with virtual connections (non-conflicting bridges only)
     function buildConnectedGroups(state, player) {
         const gd = ensureGameData();
         if (!gd) return null;
@@ -111,10 +141,11 @@
             }
         }
 
-        // Then, union tiles connected by bridges (virtual connections)
-        const bridges = findBridges(state, player);
-        for (const [a, b] of bridges) {
-            uf.union(a, b);
+        // Then, union tiles connected by non-conflicting bridges
+        const allBridges = findBridges(state, player);
+        const validBridges = selectNonConflictingBridges(allBridges);
+        for (const bridge of validBridges) {
+            uf.union(bridge.tiles[0], bridge.tiles[1]);
         }
 
         return uf;
@@ -176,7 +207,8 @@
 
     // Solve resistance network using Gauss-Seidel iteration
     // Returns { resistance, potentials } where potentials[i] is voltage at empty cell i
-    function solveResistanceNetwork(state, player, componentTiles, antipodeSet) {
+    // blockedByVirtual: Set of empty cells that are part of opponent's virtual connections
+    function solveResistanceNetwork(state, player, componentTiles, antipodeSet, blockedByVirtual = new Set()) {
         const gd = ensureGameData();
         if (!gd) return { resistance: Infinity, potentials: {} };
 
@@ -197,12 +229,13 @@
                 potential[i] = 1.0;
             } else if (targetSet.has(i)) {
                 potential[i] = 0.0;
+            } else if (state[i] === opponent || blockedByVirtual.has(i)) {
+                // Opponent cells AND opponent's virtual connection cells are blocked
+                potential[i] = -1; // blocked
             } else if (state[i] === 0) {
                 potential[i] = 0.5;
                 isEmptyCell[i] = true;
                 emptyCells.push(i);
-            } else if (state[i] === opponent) {
-                potential[i] = -1; // blocked
             }
         }
 
@@ -271,6 +304,10 @@
             return { minResistance: 0, potentials: {}, currents: {} };
         }
 
+        // Get opponent's virtual connection cells (treat as blocked)
+        const opponent = player === 1 ? 2 : 1;
+        const opponentBridgeCells = getBridgeEmptyCells(state, opponent);
+
         let minResistance = Infinity;
         let bestPotentials = {};
 
@@ -278,7 +315,7 @@
             if (info.antipodes.size === 0) continue; // no targets reachable
             
             const { resistance, potentials } = solveResistanceNetwork(
-                state, player, info.tiles, info.antipodes
+                state, player, info.tiles, info.antipodes, opponentBridgeCells
             );
             
             if (resistance < minResistance) {
@@ -308,21 +345,20 @@
         return blueR - redR;
     }
 
-    // Get move priorities based on current importance
-    function getMovePriorities(state) {
-        const red = computeMinResistance(state, 1);
-        const blue = computeMinResistance(state, 2);
+    // Get move priorities based on opponent's current (block their bottlenecks)
+    function getMovePriorities(state, currentPlayer) {
+        // Prioritize by opponent's current - block their critical paths
+        const opponent = currentPlayer === 1 ? 2 : 1;
+        const oppData = computeMinResistance(state, opponent);
 
         const priorities = [];
         for (let i = 0; i < state.length; i++) {
             if (state[i] !== 0) continue;
-            const redCurrent = red.currents[i] || 0;
-            const blueCurrent = blue.currents[i] || 0;
-            const importance = redCurrent + blueCurrent;
-            priorities.push({ move: i, importance });
+            const oppCurrent = oppData.currents[i] || 0;
+            priorities.push({ move: i, importance: oppCurrent });
         }
 
-        // Sort by importance descending
+        // Sort by importance descending (highest opponent current first)
         priorities.sort((a, b) => b.importance - a.importance);
         return priorities.map(p => p.move);
     }
@@ -433,8 +469,8 @@
             const move = this.untriedMoves.shift();
             const newState = window.applyMove(this.state, move, this.playerToMove);
             const nextPlayer = this.playerToMove === 1 ? 2 : 1;
-            // Get prioritized moves for child based on new state
-            const childMoves = getMovePriorities(newState);
+            // Get prioritized moves for child based on new state (prioritize blocking opponent)
+            const childMoves = getMovePriorities(newState, nextPlayer);
             const child = new MctsNodeEnhanced(move, this, newState, nextPlayer, childMoves);
             this.children.push(child);
             return child;
@@ -466,8 +502,8 @@
     function mctsSearchEnhanced(iterations, aiPlayer) {
         const state = window.cloneState();
         
-        // Get prioritized moves for root based on current importance
-        const prioritizedMoves = getMovePriorities(state);
+        // Get prioritized moves for root (prioritize blocking opponent's bottlenecks)
+        const prioritizedMoves = getMovePriorities(state, aiPlayer);
         const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
 
         for (let i = 0; i < iterations; i++) {
@@ -629,8 +665,8 @@
     function mctsSearchEnhancedTimed(timeLimitMs, aiPlayer) {
         const state = window.cloneState();
         
-        // Get prioritized moves for root
-        const prioritizedMoves = getMovePriorities(state);
+        // Get prioritized moves for root (prioritize blocking opponent's bottlenecks)
+        const prioritizedMoves = getMovePriorities(state, aiPlayer);
         const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
         
         const startTime = performance.now();
