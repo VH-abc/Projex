@@ -5,6 +5,7 @@
 
     let gameData = null;
     let useEnhancedAI = false;
+    let useRAVE = false;
 
     function ensureGameData() {
         if (!gameData && window.getGameData) {
@@ -552,13 +553,84 @@
 
     window.setEnhancedAI = function(enabled) {
         useEnhancedAI = enabled;
+        if (enabled) useRAVE = false; // Only one mode at a time
     };
 
     window.isEnhancedAI = function() {
         return useEnhancedAI;
     };
 
+    window.setRAVE = function(enabled) {
+        useRAVE = enabled;
+        if (enabled) useEnhancedAI = false; // Only one mode at a time
+    };
+
+    window.isRAVE = function() {
+        return useRAVE;
+    };
+
     window.mctsSearchEnhanced = mctsSearchEnhanced;
+
+    // RAVE search for playing against (iteration-based, not time-based)
+    window.mctsSearchRAVE = function(iterations, aiPlayer) {
+        const state = window.cloneState();
+        const root = new MctsNodeRAVE(null, null, state, aiPlayer);
+        
+        for (let i = 0; i < iterations; i++) {
+            let node = root;
+            
+            // Selection using RAVE
+            while (node.untriedMoves.length === 0 && node.children.length > 0) {
+                node = node.bestChildRAVE();
+            }
+            
+            // Expansion
+            if (node.untriedMoves.length > 0) {
+                node = node.expand();
+            }
+            
+            // Simulation (random rollout) - track all moves played
+            let simState = node.state.slice();
+            let player = node.playerToMove;
+            const movesPlayed = [];
+            
+            let simMoves = window.getValidMoves(simState);
+            while (simMoves.length > 0) {
+                if (window.checkWinFast(simState, 1)) break;
+                if (window.checkWinFast(simState, 2)) break;
+                
+                const move = simMoves[Math.floor(Math.random() * simMoves.length)];
+                movesPlayed.push({ move, player });
+                simState[move] = player;
+                player = player === 1 ? 2 : 1;
+                simMoves = window.getValidMoves(simState);
+            }
+            
+            // Determine winner
+            let winner = 0;
+            if (window.checkWinFast(simState, 1)) winner = 1;
+            else if (window.checkWinFast(simState, 2)) winner = 2;
+            
+            // Calculate value from AI's perspective
+            let value = 0;
+            if (winner === aiPlayer) value = 1;
+            else if (winner !== 0) value = 0;
+            else value = 0.5;
+            
+            // Backpropagation with RAVE
+            raveBackprop(node, value, movesPlayed, aiPlayer);
+        }
+        
+        // Select best move by visit count
+        let bestMove = null, bestVisits = -1;
+        for (const child of root.children) {
+            if (child.visits > bestVisits) {
+                bestVisits = child.visits;
+                bestMove = child.move;
+            }
+        }
+        return bestMove;
+    };
 
     // Expose current flow data for visualization
     window.getCurrentFlowData = function() {
@@ -593,7 +665,7 @@
         };
     };
 
-    // Time-limited MCTS for basic AI
+    // Time-limited MCTS for basic AI (random ordering, random rollouts)
     function mctsSearchTimed(timeLimitMs, aiPlayer) {
         const state = window.cloneState();
         const root = new MctsNodeEnhanced(null, null, state, aiPlayer);
@@ -661,7 +733,7 @@
         return { move: bestMove, iterations };
     }
 
-    // Time-limited enhanced MCTS with electrical resistance
+    // Time-limited enhanced MCTS with electrical resistance (heuristic eval, no rollouts)
     function mctsSearchEnhancedTimed(timeLimitMs, aiPlayer) {
         const state = window.cloneState();
         
@@ -700,46 +772,383 @@
         return { move: bestMove, iterations };
     }
 
-    // Test harness to pit AIs against each other (time-matched)
-    window.testAIs = function(numGames, callback) {
+    // ============ HYBRID A: Resistance ordering + Random rollouts ============
+    function mctsSearchHybridATimed(timeLimitMs, aiPlayer) {
+        const state = window.cloneState();
+        
+        // Get prioritized moves for root (resistance-based ordering)
+        const prioritizedMoves = getMovePriorities(state, aiPlayer);
+        const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
+        
+        const startTime = performance.now();
+        let iterations = 0;
+        
+        while (performance.now() - startTime < timeLimitMs) {
+            let node = root;
+            
+            // Selection
+            while (node.untriedMoves.length === 0 && node.children.length > 0) {
+                node = node.bestChild();
+            }
+            
+            // Expansion with prioritized moves
+            if (node.untriedMoves.length > 0) {
+                node = node.expandPrioritized();
+            }
+            
+            // RANDOM ROLLOUT (like basic MCTS)
+            let simState = node.state.slice();
+            let player = node.playerToMove;
+            let simMoves = window.getValidMoves(simState);
+            while (simMoves.length > 0) {
+                if (window.checkWinFast(simState, 1)) break;
+                if (window.checkWinFast(simState, 2)) break;
+                const move = simMoves[Math.floor(Math.random() * simMoves.length)];
+                simState[move] = player;
+                player = player === 1 ? 2 : 1;
+                simMoves = window.getValidMoves(simState);
+            }
+            
+            let winner = 0;
+            if (window.checkWinFast(simState, 1)) winner = 1;
+            else if (window.checkWinFast(simState, 2)) winner = 2;
+            
+            // Backprop
+            let n = node;
+            while (n !== null) {
+                n.visits++;
+                if (winner === aiPlayer) n.totalValue++;
+                else if (winner !== 0) n.totalValue -= 0.5;
+                n = n.parent;
+            }
+            
+            iterations++;
+        }
+        
+        let bestMove = null, bestVisits = -1;
+        for (const child of root.children) {
+            if (child.visits > bestVisits) {
+                bestVisits = child.visits;
+                bestMove = child.move;
+            }
+        }
+        return { move: bestMove, iterations };
+    }
+
+    // ============ HYBRID B: Resistance ordering + Resistance-guided rollouts ============
+    function mctsSearchHybridBTimed(timeLimitMs, aiPlayer) {
+        const state = window.cloneState();
+        
+        // Get prioritized moves for root (resistance-based ordering)
+        const prioritizedMoves = getMovePriorities(state, aiPlayer);
+        const root = new MctsNodeEnhanced(null, null, state, aiPlayer, prioritizedMoves);
+        
+        const startTime = performance.now();
+        let iterations = 0;
+        
+        while (performance.now() - startTime < timeLimitMs) {
+            let node = root;
+            
+            // Selection
+            while (node.untriedMoves.length === 0 && node.children.length > 0) {
+                node = node.bestChild();
+            }
+            
+            // Expansion with prioritized moves
+            if (node.untriedMoves.length > 0) {
+                node = node.expandPrioritized();
+            }
+            
+            // RESISTANCE-GUIDED ROLLOUT
+            // Use biased move selection: prefer high-current cells
+            let simState = node.state.slice();
+            let player = node.playerToMove;
+            let simMoves = window.getValidMoves(simState);
+            
+            while (simMoves.length > 0) {
+                if (window.checkWinFast(simState, 1)) break;
+                if (window.checkWinFast(simState, 2)) break;
+                
+                // Get opponent's currents for move bias (every few moves to save time)
+                let move;
+                if (simMoves.length > 3 && iterations % 3 === 0) {
+                    // Use resistance to bias move selection
+                    const opponent = player === 1 ? 2 : 1;
+                    const oppData = computeMinResistance(simState, opponent);
+                    
+                    // Sort moves by opponent current (block their paths)
+                    const movesWithCurrent = simMoves.map(m => ({
+                        move: m,
+                        current: oppData.currents[m] || 0
+                    }));
+                    movesWithCurrent.sort((a, b) => b.current - a.current);
+                    
+                    // Pick from top 3 with some randomness
+                    const topN = Math.min(3, movesWithCurrent.length);
+                    const idx = Math.floor(Math.random() * topN);
+                    move = movesWithCurrent[idx].move;
+                } else {
+                    // Random selection to save computation
+                    move = simMoves[Math.floor(Math.random() * simMoves.length)];
+                }
+                
+                simState[move] = player;
+                player = player === 1 ? 2 : 1;
+                simMoves = window.getValidMoves(simState);
+            }
+            
+            let winner = 0;
+            if (window.checkWinFast(simState, 1)) winner = 1;
+            else if (window.checkWinFast(simState, 2)) winner = 2;
+            
+            // Backprop
+            let n = node;
+            while (n !== null) {
+                n.visits++;
+                if (winner === aiPlayer) n.totalValue++;
+                else if (winner !== 0) n.totalValue -= 0.5;
+                n = n.parent;
+            }
+            
+            iterations++;
+        }
+        
+        let bestMove = null, bestVisits = -1;
+        for (const child of root.children) {
+            if (child.visits > bestVisits) {
+                bestVisits = child.visits;
+                bestMove = child.move;
+            }
+        }
+        return { move: bestMove, iterations };
+    }
+
+    // ============ RAVE (Rapid Action Value Estimation) ============
+    
+    // MCTS Node with AMAF (All Moves As First) statistics for RAVE
+    class MctsNodeRAVE {
+        constructor(move, parent, state, playerToMove) {
+            this.move = move;
+            this.parent = parent;
+            this.state = state;
+            this.playerToMove = playerToMove;
+            this.children = [];
+            this.visits = 0;
+            this.totalValue = 0;
+            this.untriedMoves = window.getValidMoves(state);
+            
+            // AMAF statistics: move index -> {visits, value}
+            this.amaf = new Map();
+        }
+
+        // Get AMAF stats for a move, initializing if needed
+        getAmaf(move) {
+            if (!this.amaf.has(move)) {
+                this.amaf.set(move, { visits: 0, value: 0 });
+            }
+            return this.amaf.get(move);
+        }
+
+        // RAVE-blended selection value
+        // Combines UCB1 with AMAF using β weighting
+        raveSelectValue(child, c = 1.414, k = 500) {
+            if (child.visits === 0) return Infinity;
+            
+            // Normal UCB1 component
+            const qNormal = child.totalValue / child.visits;
+            const exploration = c * Math.sqrt(Math.log(this.visits) / child.visits);
+            const ucb1 = qNormal + exploration;
+            
+            // AMAF component
+            const amafStats = this.getAmaf(child.move);
+            if (amafStats.visits === 0) {
+                return ucb1; // No AMAF data, use pure UCB1
+            }
+            const qAmaf = amafStats.value / amafStats.visits;
+            
+            // Beta weighting: decreases as visits increase
+            // β = sqrt(k / (3n + k)) where n is child visits
+            const beta = Math.sqrt(k / (3 * child.visits + k));
+            
+            // Blend normal Q with AMAF Q, add exploration
+            const blendedQ = (1 - beta) * qNormal + beta * qAmaf;
+            return blendedQ + exploration;
+        }
+
+        // Select best child using RAVE
+        bestChildRAVE() {
+            let best = null, bestScore = -Infinity;
+            for (const child of this.children) {
+                const score = this.raveSelectValue(child);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = child;
+                }
+            }
+            return best;
+        }
+
+        // Expand: create a new child for a random untried move
+        expand() {
+            const idx = Math.floor(Math.random() * this.untriedMoves.length);
+            const move = this.untriedMoves.splice(idx, 1)[0];
+            const newState = window.applyMove(this.state, move, this.playerToMove);
+            const nextPlayer = this.playerToMove === 1 ? 2 : 1;
+            const child = new MctsNodeRAVE(move, this, newState, nextPlayer);
+            this.children.push(child);
+            return child;
+        }
+    }
+
+    // RAVE backpropagation: update both normal stats and AMAF stats
+    function raveBackprop(node, value, movesPlayed, aiPlayer) {
+        // movesPlayed: array of {move, player} objects from the simulation
+        
+        while (node !== null) {
+            node.visits++;
+            node.totalValue += value;
+            
+            // Update AMAF stats for all moves played by the node's player
+            // that are still valid at this node
+            const validMovesSet = new Set(window.getValidMoves(node.state));
+            for (const { move, player } of movesPlayed) {
+                // Only count moves played by the player whose turn it is at this node
+                // (same-player AMAF)
+                if (player === node.playerToMove && validMovesSet.has(move)) {
+                    const amaf = node.getAmaf(move);
+                    amaf.visits++;
+                    amaf.value += value;
+                }
+            }
+            
+            node = node.parent;
+        }
+    }
+
+    // Time-limited MCTS with RAVE
+    function mctsSearchRAVETimed(timeLimitMs, aiPlayer) {
+        const state = window.cloneState();
+        const root = new MctsNodeRAVE(null, null, state, aiPlayer);
+        
+        const startTime = performance.now();
+        let iterations = 0;
+        
+        while (performance.now() - startTime < timeLimitMs) {
+            let node = root;
+            
+            // Selection using RAVE
+            while (node.untriedMoves.length === 0 && node.children.length > 0) {
+                node = node.bestChildRAVE();
+            }
+            
+            // Expansion
+            if (node.untriedMoves.length > 0) {
+                node = node.expand();
+            }
+            
+            // Simulation (random rollout) - track all moves played
+            let simState = node.state.slice();
+            let player = node.playerToMove;
+            const movesPlayed = [];
+            
+            let simMoves = window.getValidMoves(simState);
+            while (simMoves.length > 0) {
+                if (window.checkWinFast(simState, 1)) break;
+                if (window.checkWinFast(simState, 2)) break;
+                
+                const move = simMoves[Math.floor(Math.random() * simMoves.length)];
+                movesPlayed.push({ move, player });
+                simState[move] = player;
+                player = player === 1 ? 2 : 1;
+                simMoves = window.getValidMoves(simState);
+            }
+            
+            // Determine winner
+            let winner = 0;
+            if (window.checkWinFast(simState, 1)) winner = 1;
+            else if (window.checkWinFast(simState, 2)) winner = 2;
+            
+            // Calculate value from AI's perspective
+            let value = 0;
+            if (winner === aiPlayer) value = 1;
+            else if (winner !== 0) value = 0;
+            else value = 0.5; // draw
+            
+            // Backpropagation with RAVE
+            raveBackprop(node, value, movesPlayed, aiPlayer);
+            
+            iterations++;
+        }
+        
+        // Select best move by visit count
+        let bestMove = null, bestVisits = -1;
+        for (const child of root.children) {
+            if (child.visits > bestVisits) {
+                bestVisits = child.visits;
+                bestMove = child.move;
+            }
+        }
+        return { move: bestMove, iterations };
+    }
+
+    // Test harness: Basic vs RAVE
+    window.testRAVE = function(numGames, callback) {
+        runAITest(numGames, 'basic', 'rave', callback);
+    };
+
+    // Generic test harness: pits AI1 vs AI2
+    // aiType: 'basic', 'enhanced', 'hybridA', 'hybridB', 'rave'
+    function runAITest(numGames, ai1Type, ai2Type, callback) {
         const gd = window.getGameData();
         if (!gd) {
             console.error("Game data not available");
             return;
         }
 
+        const getAISearch = (type) => {
+            switch (type) {
+                case 'basic': return mctsSearchTimed;
+                case 'enhanced': return mctsSearchEnhancedTimed;
+                case 'hybridA': return mctsSearchHybridATimed;
+                case 'hybridB': return mctsSearchHybridBTimed;
+                case 'rave': return mctsSearchRAVETimed;
+                default: return mctsSearchTimed;
+            }
+        };
+
+        const ai1Search = getAISearch(ai1Type);
+        const ai2Search = getAISearch(ai2Type);
+
         const results = {
-            basicWins: 0,
-            enhancedWins: 0,
+            ai1Wins: 0,
+            ai2Wins: 0,
             draws: 0,
             totalMoves: 0,
-            basicTime: 0,
-            enhancedTime: 0,
-            basicIterations: 0,
-            enhancedIterations: 0,
+            ai1Time: 0,
+            ai2Time: 0,
+            ai1Iterations: 0,
+            ai2Iterations: 0,
             games: []
         };
 
-        // Time per move in milliseconds (derived from iteration slider as proxy)
+        // Time per move in milliseconds
         const settings = window.getAISettings();
         const timePerMoveMs = Math.max(50, Math.min(5000, settings.mctsIter / 10));
         
         function runGame(gameNum) {
             // Alternate who plays first
-            const basicPlaysRed = gameNum % 2 === 0;
-            const basicPlayer = basicPlaysRed ? 1 : 2;
-            const enhancedPlayer = basicPlaysRed ? 2 : 1;
+            const ai1PlaysRed = gameNum % 2 === 0;
+            const ai1Player = ai1PlaysRed ? 1 : 2;
+            const ai2Player = ai1PlaysRed ? 2 : 1;
 
-            // Initialize empty state
             let state = new Array(gd.tileCount).fill(0);
             let currentPlayer = 1;
             let moves = 0;
-            let gameBasicTime = 0;
-            let gameEnhancedTime = 0;
-            let gameBasicIter = 0;
-            let gameEnhancedIter = 0;
+            let gameAI1Time = 0;
+            let gameAI2Time = 0;
+            let gameAI1Iter = 0;
+            let gameAI2Iter = 0;
 
-            // Temporarily override cloneState for the search functions
             const origCloneState = window.cloneState;
             window.cloneState = () => state.slice();
 
@@ -751,17 +1160,17 @@
                 }
 
                 let result;
-                const isBasicTurn = currentPlayer === basicPlayer;
+                const isAI1Turn = currentPlayer === ai1Player;
                 const startTime = performance.now();
 
-                if (isBasicTurn) {
-                    result = mctsSearchTimed(timePerMoveMs, currentPlayer);
-                    gameBasicTime += performance.now() - startTime;
-                    gameBasicIter += result.iterations;
+                if (isAI1Turn) {
+                    result = ai1Search(timePerMoveMs, currentPlayer);
+                    gameAI1Time += performance.now() - startTime;
+                    gameAI1Iter += result.iterations;
                 } else {
-                    result = mctsSearchEnhancedTimed(timePerMoveMs, currentPlayer);
-                    gameEnhancedTime += performance.now() - startTime;
-                    gameEnhancedIter += result.iterations;
+                    result = ai2Search(timePerMoveMs, currentPlayer);
+                    gameAI2Time += performance.now() - startTime;
+                    gameAI2Iter += result.iterations;
                 }
 
                 if (result.move === null) {
@@ -773,19 +1182,19 @@
                 moves++;
 
                 if (window.checkWinFast(state, currentPlayer)) {
-                    if (isBasicTurn) {
-                        results.basicWins++;
+                    if (isAI1Turn) {
+                        results.ai1Wins++;
                     } else {
-                        results.enhancedWins++;
+                        results.ai2Wins++;
                     }
                     results.games.push({
                         gameNum,
-                        winner: isBasicTurn ? 'basic' : 'enhanced',
+                        winner: isAI1Turn ? ai1Type : ai2Type,
                         moves,
-                        basicTime: gameBasicTime,
-                        enhancedTime: gameEnhancedTime,
-                        basicIter: gameBasicIter,
-                        enhancedIter: gameEnhancedIter
+                        ai1Time: gameAI1Time,
+                        ai2Time: gameAI2Time,
+                        ai1Iter: gameAI1Iter,
+                        ai2Iter: gameAI2Iter
                     });
                     break;
                 }
@@ -796,15 +1205,17 @@
             window.cloneState = origCloneState;
 
             results.totalMoves += moves;
-            results.basicTime += gameBasicTime;
-            results.enhancedTime += gameEnhancedTime;
-            results.basicIterations += gameBasicIter;
-            results.enhancedIterations += gameEnhancedIter;
+            results.ai1Time += gameAI1Time;
+            results.ai2Time += gameAI2Time;
+            results.ai1Iterations += gameAI1Iter;
+            results.ai2Iterations += gameAI2Iter;
 
             if (callback) {
                 callback({
                     progress: gameNum + 1,
                     total: numGames,
+                    ai1Type,
+                    ai2Type,
                     results
                 });
             }
@@ -818,15 +1229,17 @@
                 setTimeout(runNextGame, 10);
             } else {
                 const summary = {
+                    ai1Type,
+                    ai2Type,
                     ...results,
                     timePerMoveMs,
                     avgMoves: results.totalMoves / numGames,
-                    avgBasicTime: results.basicTime / numGames,
-                    avgEnhancedTime: results.enhancedTime / numGames,
-                    avgBasicIter: Math.round(results.basicIterations / results.totalMoves * 2),
-                    avgEnhancedIter: Math.round(results.enhancedIterations / results.totalMoves * 2),
-                    basicWinRate: (results.basicWins / numGames * 100).toFixed(1) + '%',
-                    enhancedWinRate: (results.enhancedWins / numGames * 100).toFixed(1) + '%'
+                    avgAI1Time: results.ai1Time / numGames,
+                    avgAI2Time: results.ai2Time / numGames,
+                    avgAI1Iter: results.totalMoves > 0 ? Math.round(results.ai1Iterations / results.totalMoves * 2) : 0,
+                    avgAI2Iter: results.totalMoves > 0 ? Math.round(results.ai2Iterations / results.totalMoves * 2) : 0,
+                    ai1WinRate: (results.ai1Wins / numGames * 100).toFixed(1) + '%',
+                    ai2WinRate: (results.ai2Wins / numGames * 100).toFixed(1) + '%'
                 };
                 console.log("Test Results:", summary);
                 if (callback) {
@@ -836,6 +1249,26 @@
         }
 
         runNextGame();
+    }
+
+    // Test harness: Basic vs Enhanced (original API)
+    window.testAIs = function(numGames, callback) {
+        runAITest(numGames, 'basic', 'enhanced', callback);
+    };
+
+    // Test harness: Basic vs Hybrid A (resistance ordering + random rollouts)
+    window.testHybridA = function(numGames, callback) {
+        runAITest(numGames, 'basic', 'hybridA', callback);
+    };
+
+    // Test harness: Basic vs Hybrid B (resistance ordering + resistance rollouts)
+    window.testHybridB = function(numGames, callback) {
+        runAITest(numGames, 'basic', 'hybridB', callback);
+    };
+
+    // Generic test interface
+    window.testAITypes = function(numGames, ai1Type, ai2Type, callback) {
+        runAITest(numGames, ai1Type, ai2Type, callback);
     };
 
     console.log("Enhanced AI loaded (Electrical Resistance Heuristic)");

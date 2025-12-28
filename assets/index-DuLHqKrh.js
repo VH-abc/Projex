@@ -21826,7 +21826,9 @@ function runAI() {
     if (!vsAI || Ia || !aiColor || !$e || !$e.equals(aiColor)) return;
     const aiPlayer = aiColor.equals(me) ? 1 : 2;
     let move;
-    if (window.isEnhancedAI && window.isEnhancedAI() && window.mctsSearchEnhanced) {
+    if (window.isRAVE && window.isRAVE() && window.mctsSearchRAVE) {
+        move = window.mctsSearchRAVE(mctsIter, aiPlayer);
+    } else if (window.isEnhancedAI && window.isEnhancedAI() && window.mctsSearchEnhanced) {
         move = window.mctsSearchEnhanced(mctsIter, aiPlayer);
     } else {
         move = mctsSearch(mctsIter, aiPlayer);

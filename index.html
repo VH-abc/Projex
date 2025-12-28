@@ -306,6 +306,9 @@
             <input type="radio" name="ai-type" value="basic" checked> Basic MCTS
           </label>
           <label>
+            <input type="radio" name="ai-type" value="rave"> RAVE
+          </label>
+          <label>
             <input type="radio" name="ai-type" value="enhanced"> Enhanced (Heuristic)
           </label>
         </div>
@@ -328,13 +331,23 @@
       background: rgba(0,0,0,0.5);
       color: white;
       border-radius: 5px;
-      width: 300px;
+      width: 320px;
       font-size: 0.9rem;
     ">
       <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 6px;">AI vs AI Test (Time-Matched)</h3>
       <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-bottom: 8px;">Both AIs get equal time per move</div>
       <div style="margin-bottom: 10px;">
-        <label>Number of games:</label>
+        <label>Test Type:</label>
+        <select id="test-type" style="margin-left: 8px; padding: 4px;">
+          <option value="rave">Basic vs RAVE</option>
+          <option value="hybridA">Basic vs Hybrid A (random rollouts)</option>
+          <option value="hybridB">Basic vs Hybrid B (resistance rollouts)</option>
+          <option value="enhanced">Basic vs Enhanced (heuristic eval)</option>
+          <option value="both">Run Both Hybrid Tests</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label>Games per test:</label>
         <input type="number" id="test-games" value="10" min="1" max="100" style="width: 60px; margin-left: 8px;">
       </div>
       <button id="run-test-btn" style="
@@ -503,6 +516,9 @@
             if (window.setEnhancedAI) {
               window.setEnhancedAI(this.value === 'enhanced');
             }
+            if (window.setRAVE) {
+              window.setRAVE(this.value === 'rave');
+            }
           });
         });
 
@@ -523,62 +539,116 @@
         // Test button
         const runTestBtn = document.getElementById('run-test-btn');
         const testGamesInput = document.getElementById('test-games');
+        const testTypeSelect = document.getElementById('test-type');
         const testProgress = document.getElementById('test-progress');
         const testResults = document.getElementById('test-results');
 
+        function formatTestResults(r, ai1Name, ai2Name) {
+          return `
+            <div style="margin-bottom: 6px;"><strong>${ai1Name} vs ${ai2Name} (${r.timePerMoveMs}ms/move):</strong></div>
+            <div>${ai1Name} wins: ${r.ai1Wins} (${r.ai1WinRate})</div>
+            <div>${ai2Name} wins: ${r.ai2Wins} (${r.ai2WinRate})</div>
+            <div>Draws: ${r.draws}</div>
+            <div style="margin-top: 4px; font-size: 0.8rem; color: rgba(255,255,255,0.7);">
+              Avg ${r.avgMoves.toFixed(1)} moves/game | ${ai1Name}: ${r.avgAI1Iter} iter, ${ai2Name}: ${r.avgAI2Iter} iter
+            </div>
+          `;
+        }
+
+        function runSingleTest(testFunc, ai1Name, ai2Name, numGames, onDone) {
+          const progressBar = document.getElementById('progress-bar');
+          const progressText = document.getElementById('progress-text');
+          
+          testFunc(numGames, function(update) {
+            if (update.done) {
+              onDone(update.results, ai1Name, ai2Name);
+            } else {
+              const pct = (update.progress / update.total * 100).toFixed(0);
+              progressBar.style.width = pct + '%';
+              progressText.textContent = `${ai1Name} vs ${ai2Name}: Game ${update.progress} / ${update.total}`;
+              
+              if (update.results.ai1Wins + update.results.ai2Wins > 0) {
+                progressText.textContent += ` (${update.results.ai1Wins}-${update.results.ai2Wins})`;
+              }
+            }
+          });
+        }
+
         runTestBtn.addEventListener('click', function() {
-          if (!window.testAIs) {
+          if (!window.testAITypes) {
             testResults.innerHTML = '<span style="color: #ff6b6b;">Please load a model first</span>';
             return;
           }
 
           const numGames = parseInt(testGamesInput.value) || 10;
+          const testType = testTypeSelect.value;
+          const actualGames = numGames % 2 === 0 ? numGames : numGames + 1;
+          
           runTestBtn.disabled = true;
           runTestBtn.textContent = 'Running...';
           testProgress.style.display = 'block';
           testResults.innerHTML = '';
           
-          // Reset progress bar
           const progressBar = document.getElementById('progress-bar');
           const progressText = document.getElementById('progress-text');
           progressBar.style.width = '0%';
           progressText.textContent = 'Starting...';
 
-          // Ensure even number of games for fair Red/Blue distribution
-          const actualGames = numGames % 2 === 0 ? numGames : numGames + 1;
-
-          window.testAIs(actualGames, function(update) {
-            if (update.done) {
+          if (testType === 'both') {
+            // Run both Hybrid A and Hybrid B tests sequentially
+            let results = [];
+            
+            runSingleTest(window.testHybridA, 'Basic', 'Hybrid A', actualGames, function(r, ai1, ai2) {
+              results.push({ r, ai1, ai2 });
+              progressBar.style.width = '50%';
+              progressText.textContent = 'Starting Hybrid B test...';
+              
+              runSingleTest(window.testHybridB, 'Basic', 'Hybrid B', actualGames, function(r2, ai1b, ai2b) {
+                results.push({ r: r2, ai1: ai1b, ai2: ai2b });
+                
+                runTestBtn.disabled = false;
+                runTestBtn.textContent = 'Run Test';
+                progressBar.style.width = '100%';
+                progressBar.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+                progressText.textContent = 'Complete!';
+                
+                testResults.innerHTML = 
+                  formatTestResults(results[0].r, results[0].ai1, results[0].ai2) +
+                  '<div style="margin: 10px 0; border-top: 1px solid rgba(255,255,255,0.3);"></div>' +
+                  formatTestResults(results[1].r, results[1].ai1, results[1].ai2);
+              });
+            });
+          } else {
+            // Run single test
+            let testFunc, ai1Name, ai2Name;
+            
+            if (testType === 'rave') {
+              testFunc = window.testRAVE;
+              ai1Name = 'Basic';
+              ai2Name = 'RAVE';
+            } else if (testType === 'hybridA') {
+              testFunc = window.testHybridA;
+              ai1Name = 'Basic';
+              ai2Name = 'Hybrid A';
+            } else if (testType === 'hybridB') {
+              testFunc = window.testHybridB;
+              ai1Name = 'Basic';
+              ai2Name = 'Hybrid B';
+            } else {
+              testFunc = window.testAIs;
+              ai1Name = 'Basic';
+              ai2Name = 'Enhanced';
+            }
+            
+            runSingleTest(testFunc, ai1Name, ai2Name, actualGames, function(r, a1, a2) {
               runTestBtn.disabled = false;
               runTestBtn.textContent = 'Run Test';
               progressBar.style.width = '100%';
               progressBar.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
               progressText.textContent = 'Complete!';
-              
-              const r = update.results;
-              testResults.innerHTML = `
-                <div style="margin-bottom: 6px;"><strong>Results (${actualGames} games, ${r.timePerMoveMs}ms/move):</strong></div>
-                <div>Basic AI wins: ${r.basicWins} (${r.basicWinRate})</div>
-                <div>Enhanced AI wins: ${r.enhancedWins} (${r.enhancedWinRate})</div>
-                <div>Draws: ${r.draws}</div>
-                <div style="margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px;">
-                  <div>Avg moves/game: ${r.avgMoves.toFixed(1)}</div>
-                  <div>Basic: ${r.avgBasicIter} iter/move avg</div>
-                  <div>Enhanced: ${r.avgEnhancedIter} iter/move avg</div>
-                </div>
-              `;
-            } else {
-              const pct = (update.progress / update.total * 100).toFixed(0);
-              progressBar.style.width = pct + '%';
-              progressText.textContent = `Game ${update.progress} / ${update.total}`;
-              
-              // Show current standings
-              const r = update.results;
-              if (r.basicWins + r.enhancedWins > 0) {
-                progressText.textContent += ` (Basic: ${r.basicWins}, Enhanced: ${r.enhancedWins})`;
-              }
-            }
-          });
+              testResults.innerHTML = formatTestResults(r, a1, a2);
+            });
+          }
         });
       });
     </script>
