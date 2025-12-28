@@ -21960,13 +21960,7 @@ function Hm(i, t) {
                 }
                 const edgePos = [];
                 edgeMap.forEach((tris, key) => {
-                    let isBoundary = true;
-                    if (tris.length === 2) {
-                        const n1 = normals[tris[0]], n2 = normals[tris[1]];
-                        const dot = n1[0]*n2[0] + n1[1]*n2[1] + n1[2]*n2[2];
-                        if (dot > 0.999) isBoundary = false;
-                    }
-                    if (isBoundary) {
+                    if (tris.length === 1) {
                         const pts = key.split('|').map(s => s.split(',').map(Number));
                         edgePos.push(...pts[0], ...pts[1]);
                     }
